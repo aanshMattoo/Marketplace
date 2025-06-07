@@ -1,6 +1,6 @@
 // backend/controllers/productController.js
 const Product = require("../models/Product");
-const { listProductOnChain, transferProductOwnershipOnChain,getEthPriceInRupees, transferETHOnChain } = require("../services/productService");
+const { listProductOnChain, transferProductOwnershipOnChain,getEthPriceInRupees, transferETHOnChain, getEthPricePast } = require("../services/productService");
 const { ethers } = require("ethers");
 const productABI = require("../blockchain/artifacts/contracts/ProductMarketplace.sol/ProductMarketplace.json").abi;
 const User = require("../models/User");
@@ -170,6 +170,35 @@ const BuyProductWithETH = async (req, res) => {
     product.isSold = true;
     product.blockchainTxHash = txHashOwnership;
     await product.save();
+
+    const finalPrice5Min = await getEthPricePast(5);
+    const finalPrice10Min = await getEthPricePast(10);
+    const finalPrice15Min = await getEthPricePast(15);
+    const finalPrice30Min = await getEthPricePast(30);
+
+    const finalAmount5Min = finalPrice5Min * requiredEth;
+    const finalAmount10Min = finalPrice10Min * requiredEth;
+    const finalAmount15Min = finalPrice15Min * requiredEth;
+    const finalAmount30Min = finalPrice30Min * requiredEth;
+
+    const factor5Min = (product.price - finalAmount5Min) / product.price;
+    const factor10Min = (product.price - finalAmount10Min) / product.price;
+    const factor15Min = (product.price - finalAmount15Min) / product.price;
+    const factor30Min = (product.price - finalAmount30Min) / product.price;
+
+    const accuracy5Min = Math.abs(1 - factor5Min) * 100;
+    const accuracy10Min = Math.abs(1 - factor10Min) * 100;
+    const accuracy15Min = Math.abs(1 - factor15Min) * 100;
+    const accuracy30Min = Math.abs(1 - factor30Min) * 100;
+
+
+    console.log("\n Transaction accuracies");
+    
+    console.log("5 minutes Latency: ", accuracy5Min.toFixed(2), "%");
+    console.log("10 minutes Latency: ", accuracy10Min.toFixed(2), "%");
+    console.log("15 minutes Latency: ", accuracy15Min.toFixed(2), "%");
+    console.log("30 minutes Latency: ", accuracy30Min.toFixed(2), "%");
+
 
     res.status(200).json({
       message: "Product purchased successfully with ETH",

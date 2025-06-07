@@ -60,13 +60,14 @@ const transferProductOwnershipOnChain = async (productId, buyerAddress) => {
   }
 };
 
+// Fetch current ETH-to-INR price
 const getEthPriceInRupees = async () => {
   try {
     const coingeckoURL = process.env.COINGECKO_API_URL.replace(/\/+$/, "");
     const apiUrl = `${coingeckoURL}/simple/price?ids=ethereum&vs_currencies=inr`;
-    
+
     console.log('Making request to:', apiUrl);
-    
+
     const response = await axios.get(apiUrl, {
       timeout: 10000,
       headers: {
@@ -75,20 +76,42 @@ const getEthPriceInRupees = async () => {
       }
     });
 
-    console.log('API Response:', response.data);
-    
-    if (!response.data?.ethereum?.inr) {
-      throw new Error('Unexpected API response format');
-    }
-    
     return response.data.ethereum.inr;
   } catch (error) {
-    console.error("Full error details:", {
-      message: error.message,
-      code: error.code,
-      responseData: error.response?.data
+    console.error("Error fetching current ETH price in INR:", error.message);
+    throw error;
+  }
+};
+
+// Fetch ETH-to-INR price from 5 minutes ago
+const getEthPricePast = async (minutes) => {
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    const fiveMinutesAgo = now - minutes * 60;
+
+    const coingeckoURL = process.env.COINGECKO_API_URL.replace(/\/+$/, "");
+    const apiUrl = `${coingeckoURL}/coins/ethereum/market_chart/range?vs_currency=inr&from=${fiveMinutesAgo}&to=${now}`;
+
+    console.log('Making historical request to:', apiUrl);
+
+    const response = await axios.get(apiUrl, {
+      timeout: 10000,
+      headers: {
+        'Accept-Encoding': 'gzip',
+        'User-Agent': 'YourApp/1.0'
+      }
     });
-    throw new Error("Failed to fetch ETH price");
+
+    const prices = response.data.prices;
+    if (!prices || prices.length === 0) {
+      throw new Error("No historical ETH price data found.");
+    }
+
+    const ethPrice5MinAgo = prices[0][1]; // first [timestamp, price] entry
+    return ethPrice5MinAgo;
+  } catch (error) {
+    console.error("Error fetching 5-minute-old ETH price:", error.message);
+    throw error;
   }
 };
 
@@ -120,5 +143,6 @@ module.exports = {
   listProductOnChain,
   transferProductOwnershipOnChain,
   transferETHOnChain,
-  getEthPriceInRupees
+  getEthPriceInRupees,
+  getEthPricePast
 };
